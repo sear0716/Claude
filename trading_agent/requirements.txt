@@ -1,0 +1,6 @@
+pandas>=2.1
+numpy>=1.26
+requests>=2.31
+ib_async>=1.0
+anthropic>=1.0  # only for --briefing
+pytest>=8
