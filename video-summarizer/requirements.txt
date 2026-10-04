@@ -1,0 +1,5 @@
+anthropic>=1.0
+yt-dlp
+# Optional: free local speech-to-text for videos without captions
+faster-whisper
+pytest
