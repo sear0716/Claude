@@ -31,6 +31,22 @@ Chat with Claude from Telegram. `bot.py` long-polls Telegram (no public URL or w
 
 The bot only runs while `python bot.py` is running. To keep it up 24/7, run it on an always-on machine or small VPS (e.g. under `systemd`, `tmux`, or Docker).
 
+## Hosting with Docker
+
+The bot only needs outbound internet access (it polls Telegram), so any machine or container host that can run Docker will do.
+
+```bash
+cd telegram-bot
+docker build -t telegram-claude-bot .
+docker run -d --name telegram-claude-bot --restart unless-stopped \
+  -e TELEGRAM_BOT_TOKEN -e ANTHROPIC_API_KEY -e ALLOWED_USER_IDS \
+  telegram-claude-bot
+```
+
+`-e NAME` with no value passes through the variable from your current shell, so the secrets never appear in the command or the image. Alternatively keep them in a `.env` file outside the repo and use `--env-file /path/to/.env`. Check it with `docker logs -f telegram-claude-bot`.
+
+Run only one copy of the bot per token: two instances polling the same token fight over updates.
+
 ## Using it
 
 - Send any text message to talk to Claude. Each chat has its own conversation memory.
