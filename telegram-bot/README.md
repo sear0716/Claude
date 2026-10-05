@@ -56,11 +56,17 @@ Run only one copy of the bot per token: two instances polling the same token fig
 
 | Variable | Default | Purpose |
 |---|---|---|
+| `ANTHROPIC_WORKSPACE_ID` | unset | Needed only if you get a 400 "API key is not scoped to a workspace" error; see Troubleshooting |
 | `TELEGRAM_BOT_MODEL` | `claude-opus-5-5` | Claude model id, e.g. `claude-sonnet-5-5` for cheaper replies |
 | `TELEGRAM_BOT_EFFORT` | `medium` | `low` is faster/cheaper for casual chat; `high` for harder questions |
 | `TELEGRAM_BOT_SYSTEM_PROMPT` | short Telegram-friendly prompt | Custom persona/instructions |
 
 Requests opt into server-side refusal fallbacks (`fallbacks: "default"`), so if the model declines a request on safety grounds the API retries it on a suitable fallback model in the same call.
+
+## Troubleshooting
+
+- **"Claude API key was rejected"**: `ANTHROPIC_API_KEY` is missing, mistyped or revoked in the terminal running the bot. Variables set with `export` last only for that terminal window.
+- **400 "This API key is not scoped to a workspace"**: your key isn't tied to a workspace. Either create the key inside a specific workspace in the Claude Console, or set the workspace id and restart the bot: `export ANTHROPIC_WORKSPACE_ID="<workspace id>"` (shown in the Console under the workspace's settings; it starts with `wrkspc_`).
 
 ## Tests
 

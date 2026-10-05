@@ -20,3 +20,14 @@ def test_split_message_respects_limit_and_keeps_content():
 def test_split_message_hard_cuts_unbroken_text():
     chunks = split_message("a" * 250, limit=100)
     assert [len(c) for c in chunks] == [100, 100, 50]
+
+
+def test_build_client_sends_workspace_header_when_configured(monkeypatch):
+    from bot import build_client
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    monkeypatch.setenv("ANTHROPIC_WORKSPACE_ID", "wrkspc_123")
+    assert build_client().default_headers["anthropic-workspace-id"] == "wrkspc_123"
+
+    monkeypatch.delenv("ANTHROPIC_WORKSPACE_ID")
+    assert "anthropic-workspace-id" not in build_client().default_headers
