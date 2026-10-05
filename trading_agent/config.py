@@ -25,6 +25,9 @@ class Config:
     ib_port: int = field(default_factory=lambda: _env_int("IB_PORT", 7497))
     ib_client_id: int = field(default_factory=lambda: _env_int("IB_CLIENT_ID", 17))
     ib_account: str | None = field(default_factory=lambda: os.environ.get("IB_ACCOUNT") or None)
+    # Startup connect retries: wait backoff, 2x backoff, ... seconds between attempts.
+    ib_connect_attempts: int = field(default_factory=lambda: _env_int("IB_CONNECT_ATTEMPTS", 3))
+    ib_connect_backoff: float = field(default_factory=lambda: _env_float("IB_CONNECT_BACKOFF", 2.0))
     # IB asks clients to space out historical-data requests (pacing limits).
     ib_request_pause: float = field(default_factory=lambda: _env_float("IB_REQUEST_PAUSE", 0.5))
 
