@@ -239,6 +239,58 @@ def test_ibkr_source_with_fake_client():
     assert not ib.connected
 
 
+class FlakyIB(FakeIB):
+    """Refuses the first `failures` connects, like TWS that is still starting up."""
+
+    def __init__(self, failures):
+        super().__init__()
+        self.connected = False
+        self.failures = failures
+        self.connect_calls = []
+
+    def connect(self, host, port, **kw):
+        self.connect_calls.append(kw)
+        if len(self.connect_calls) <= self.failures:
+            raise ConnectionRefusedError(61, "Connect call failed")
+        self.connected = True
+
+
+def _retry_cfg(attempts):
+    cfg = Config()
+    cfg.ib_connect_attempts = attempts
+    cfg.ib_connect_backoff = 1.0
+    return cfg
+
+
+def test_ibkr_connect_retries_with_backoff(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr("trading_agent.sources.ibkr.time.sleep", sleeps.append)
+    ib = FlakyIB(failures=2)
+    assert IBKRSource(_retry_cfg(3), ib=ib).connect() is ib
+    assert len(ib.connect_calls) == 3 and sleeps == [1.0, 2.0]
+    assert all(kw["readonly"] is True for kw in ib.connect_calls)
+
+
+def test_ibkr_connect_gives_up_with_clear_error(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr("trading_agent.sources.ibkr.time.sleep", sleeps.append)
+    ib = FlakyIB(failures=99)
+    with pytest.raises(ConnectionError, match=r"127\.0\.0\.1:7497.*after 3 attempts"):
+        IBKRSource(_retry_cfg(3), ib=ib).connect()
+    assert len(ib.connect_calls) == 3 and sleeps == [1.0, 2.0]
+
+
+def test_cli_exits_cleanly_when_ib_unreachable(monkeypatch, capsys):
+    from trading_agent import cli
+
+    def refuse(self):
+        raise ConnectionError("Could not connect to TWS/IB Gateway")
+
+    monkeypatch.setattr(IBKRSource, "connect", refuse)
+    assert cli.main(["--symbols", "AAPL"]) == 2
+    assert "Could not connect" in capsys.readouterr().err
+
+
 # --- offline -----------------------------------------------------------------------------
 
 def test_csv_and_demo_sources(tmp_path):

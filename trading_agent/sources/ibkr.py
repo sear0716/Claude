@@ -45,13 +45,34 @@ class IBKRSource:
         except ImportError as exc:  # pragma: no cover - import guard
             raise RuntimeError("ib_async is not installed: pip install ib_async") from exc
         ib = self._ib or IB()
-        ib.connect(
-            self.cfg.ib_host,
-            self.cfg.ib_port,
-            clientId=self.cfg.ib_client_id,
-            readonly=True,
-            timeout=15,
-        )
+        attempts = max(1, self.cfg.ib_connect_attempts)
+        delay = self.cfg.ib_connect_backoff
+        for attempt in range(1, attempts + 1):
+            try:
+                ib.connect(
+                    self.cfg.ib_host,
+                    self.cfg.ib_port,
+                    clientId=self.cfg.ib_client_id,
+                    readonly=True,
+                    timeout=15,
+                )
+                break
+            except (OSError, ConnectionError) as exc:  # refused, timed out, dropped during handshake
+                if attempt == attempts:
+                    raise ConnectionError(
+                        f"Could not connect to TWS/IB Gateway at {self.cfg.ib_host}:{self.cfg.ib_port} "
+                        f"(clientId {self.cfg.ib_client_id}) after {attempts} attempts: {exc!r}. "
+                        "Check that TWS or IB Gateway is running and logged in, that "
+                        "'Enable ActiveX and Socket Clients' is on, that IB_PORT matches the API port "
+                        "(paper TWS 7497, live TWS 7496, paper Gateway 4002, live Gateway 4001), "
+                        "and that no other client is using the same IB_CLIENT_ID."
+                    ) from exc
+                log.warning(
+                    "IB connect attempt %d/%d to %s:%d failed (%s); retrying in %.1fs",
+                    attempt, attempts, self.cfg.ib_host, self.cfg.ib_port, exc, delay,
+                )
+                time.sleep(delay)
+                delay *= 2
         self._ib = ib
         return ib
 

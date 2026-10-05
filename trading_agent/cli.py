@@ -83,7 +83,12 @@ def main(argv=None) -> int:
     if args.equity:
         cfg.default_equity = args.equity
 
-    agent, broker = build_agent(args, cfg)
+    try:
+        agent, broker = build_agent(args, cfg)
+    except ConnectionError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        print("Tip: use --demo or --prices-dir to run without IBKR.", file=sys.stderr)
+        return 2
     try:
         report = agent.run(with_news=not args.no_news).to_dict()
     finally:
