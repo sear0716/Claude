@@ -1,6 +1,8 @@
 # Claude
 Claude Projects
 
+- [`telegram-bot/`](telegram-bot/README.md): chat with Claude from Telegram using a BotFather token.
+
 ## IB account check
 
 `ib_account_check.py` connects to a running TWS read-only (it cannot place orders) and prints the managed account(s), key account summary values and open positions.
