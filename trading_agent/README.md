@@ -51,6 +51,8 @@ pip install -r trading_agent/requirements.txt
 ```bash
 export IB_PORT=7497              # 7497 paper TWS, 7496 live TWS, 4002/4001 Gateway
 export IB_CLIENT_ID=17
+export IB_CONNECT_ATTEMPTS=3      # optional; startup connect retries, waiting 2s, 4s, ... between them
+export IB_CONNECT_BACKOFF=2      # optional; first retry delay in seconds
 export SEC_USER_AGENT="Your Name your.email@example.com"   # SEC requires contact info
 export FRED_API_KEY=...          # optional; free at fred.stlouisfed.org. Without it the public CSV endpoint is used
 export ANTHROPIC_API_KEY=...     # optional, only for --briefing
