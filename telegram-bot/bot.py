@@ -37,6 +37,19 @@ TELEGRAM_MAX_CHARS = 4096
 log = logging.getLogger("telegram-bot")
 
 
+def build_client() -> anthropic.AsyncAnthropic:
+    """Create the Claude client.
+
+    API keys that aren't tied to a workspace need the workspace id sent as a header
+    (otherwise the API answers 400 "not scoped to a workspace"). Set
+    ANTHROPIC_WORKSPACE_ID to enable that; leave it unset for workspace-scoped keys.
+    """
+    workspace_id = os.environ.get("ANTHROPIC_WORKSPACE_ID", "").strip()
+    if workspace_id:
+        return anthropic.AsyncAnthropic(default_headers={"anthropic-workspace-id": workspace_id})
+    return anthropic.AsyncAnthropic()
+
+
 def parse_allowed_ids(raw: str) -> set[int]:
     return {int(part) for part in raw.replace(" ", "").split(",") if part}
 
@@ -158,7 +171,7 @@ def main() -> None:
         log.warning("ALLOWED_USER_IDS is empty: the bot will only reply with each sender's user id.")
 
     app = Application.builder().token(token).build()
-    app.bot_data["chat"] = ClaudeChat(anthropic.AsyncAnthropic())
+    app.bot_data["chat"] = ClaudeChat(build_client())
 
     allowed_filter = filters.User(user_id=allowed) if allowed else filters.User(user_id=[])
     app.add_handler(CommandHandler("start", start, filters=allowed_filter))
