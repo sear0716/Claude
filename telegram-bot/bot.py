@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Telegram bot that relays your messages to Claude and sends back the reply.
 
-    export TELEGRAM_BOT_TOKEN=8687082386:AAFCIFGxZ4qRpa196IFnKrMIQXjReh0o_T4        # from @BotFather
-    export ANTHROPIC_API_KEY=apikey_019V8dbYfucjUea5DxHDc6FC         # from console.anthropic.com
+    export TELEGRAM_BOT_TOKEN="BOT KEY"        # from @BotFather
+    export ANTHROPIC_API_KEY="ANT KEY"         # from console.anthropic.com
     export ALLOWED_USER_IDS=123456789    # comma-separated Telegram user ids
     python bot.py
 
