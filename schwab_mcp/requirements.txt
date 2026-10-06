@@ -1,5 +1,8 @@
 mcp>=2.3,<3
 httpx>=0.28
 python-dotenv>=1.0
+# cryptography (pulled in by mcp via pyjwt[crypto]) stopped shipping Intel-Mac wheels
+# after 48.x; without this pin pip tries to compile it from source and fails.
+cryptography<49; sys_platform == "darwin" and platform_machine == "x86_64"
 # Optional: TOKEN_STORE=keyring stores tokens in the OS keychain.
 # keyring>=25
