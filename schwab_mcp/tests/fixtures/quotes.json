@@ -1,0 +1,13 @@
+{
+  "AAPL": {
+    "assetMainType": "EQUITY", "symbol": "AAPL", "realtime": true, "quoteType": "NBBO",
+    "quote": {"52WeekHigh": 199.62, "52WeekLow": 143.9, "askPrice": 180.06, "askSize": 2,
+              "bidPrice": 180.04, "bidSize": 3, "closePrice": 178.5, "highPrice": 181.0,
+              "lastPrice": 180.05, "lowPrice": 177.9, "mark": 180.05, "netChange": 1.55,
+              "netPercentChange": 0.8683, "openPrice": 178.9, "quoteTime": 1735833600000,
+              "totalVolume": 51234567, "tradeTime": 1735833599000},
+    "fundamental": {"peRatio": 29.5, "eps": 6.1, "divYield": 0.53, "divAmount": 0.96, "avg10DaysVolume": 48000000},
+    "reference": {"description": "Apple Inc", "exchangeName": "NASDAQ"}
+  },
+  "errors": {"invalidSymbols": ["ZZZZZ"]}
+}
