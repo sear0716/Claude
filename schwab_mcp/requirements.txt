@@ -1,0 +1,5 @@
+mcp>=2.3,<3
+httpx>=0.28
+python-dotenv>=1.0
+# Optional: TOKEN_STORE=keyring stores tokens in the OS keychain.
+# keyring>=25

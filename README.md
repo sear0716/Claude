@@ -2,6 +2,7 @@
 Claude Projects
 
 - [`telegram-bot/`](telegram-bot/README.md): chat with Claude from Telegram using a BotFather token.
+- [`schwab_mcp/`](schwab_mcp/README.md): read-only MCP server for your Schwab accounts and market data (Claude Code and Claude Desktop).
 
 ## IB account check
 

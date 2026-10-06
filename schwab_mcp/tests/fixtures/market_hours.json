@@ -1,0 +1,16 @@
+{
+  "equity": {
+    "EQ": {
+      "date": "2025-01-02", "marketType": "EQUITY", "exchange": "NULL", "category": "NULL",
+      "product": "EQ", "productName": "equity", "isOpen": true,
+      "sessionHours": {
+        "preMarket": [{"start": "2025-01-02T07:00:00-05:00", "end": "2025-01-02T09:30:00-05:00"}],
+        "regularMarket": [{"start": "2025-01-02T09:30:00-05:00", "end": "2025-01-02T16:00:00-05:00"}],
+        "postMarket": [{"start": "2025-01-02T16:00:00-05:00", "end": "2025-01-02T20:00:00-05:00"}]
+      }
+    }
+  },
+  "option": {
+    "option": {"date": "2025-01-02", "marketType": "OPTION", "product": "option", "isOpen": false}
+  }
+}

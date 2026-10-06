@@ -1,0 +1,21 @@
+{
+  "securitiesAccount": {
+    "type": "MARGIN",
+    "accountNumber": "12345678",
+    "positions": [
+      {
+        "shortQuantity": 0.0, "averagePrice": 150.0, "currentDayProfitLoss": 120.0,
+        "currentDayProfitLossPercentage": 0.67, "longQuantity": 100.0,
+        "instrument": {"assetType": "EQUITY", "cusip": "037833100", "symbol": "AAPL", "description": "APPLE INC"},
+        "marketValue": 18000.0, "longOpenProfitLoss": 3000.0, "averageLongPrice": 150.0
+      },
+      {
+        "shortQuantity": 0.0, "averagePrice": 5.5, "currentDayProfitLoss": -40.0,
+        "currentDayProfitLossPercentage": -6.25, "longQuantity": 2.0,
+        "instrument": {"assetType": "OPTION", "symbol": "AAPL  250117C00200000", "description": "AAPL 01/17/2025 200.00 C"},
+        "marketValue": 600.0, "longOpenProfitLoss": -500.0
+      }
+    ],
+    "currentBalances": {"liquidationValue": 101000.25}
+  }
+}

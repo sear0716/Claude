@@ -4,3 +4,11 @@ __pycache__/
 reports/
 ibenv/
 data/
+
+# Schwab MCP server: secrets and tokens
+.env
+.env.*
+!.env.example
+*.token.json
+schwab_token*.json
+.venv/
