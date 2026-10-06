@@ -97,6 +97,7 @@ python -m schwab_mcp.auth --status
 
 | Symptom | Fix |
 |---|---|
+| `pip install` fails building `cryptography` (OpenSSL / pkg-config / Rust errors) on an Intel Mac | Pull the latest `main`, which pins `cryptography<49` there (newer versions have no Intel-Mac wheels), then run `pip install -r schwab_mcp/requirements.txt` again |
 | `Missing SCHWAB_APP_KEY ...` | `schwab_mcp/.env` is missing or incomplete, or `SCHWAB_ENV_FILE` points to the wrong place |
 | `Schwab session expired, run auth.py ...` | The 7 days are up, the token file is missing, or Schwab revoked it. Run `python -m schwab_mcp.auth` |
 | Token exchange failed | You took more than about 30 seconds, pasted part of the URL, or the callback URL differs from the app's. Run auth again |
