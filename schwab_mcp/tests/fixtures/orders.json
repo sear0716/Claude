@@ -1,0 +1,24 @@
+[
+  {
+    "orderId": 9001,
+    "accountNumber": 12345678,
+    "status": "WORKING",
+    "enteredTime": "2026-10-07T14:00:00+0000",
+    "orderType": "LIMIT",
+    "duration": "DAY",
+    "session": "NORMAL",
+    "quantity": 10,
+    "filledQuantity": 0,
+    "price": 150.5,
+    "orderLegCollection": [
+      {
+        "instruction": "BUY",
+        "quantity": 10,
+        "instrument": {
+          "symbol": "AAPL",
+          "assetType": "EQUITY"
+        }
+      }
+    ]
+  }
+]

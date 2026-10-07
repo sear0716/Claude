@@ -235,7 +235,7 @@ def test_market_hours_rejects_unknown_market(api, backend):
     assert "markets" in error_text(call("get_market_hours", markets=["crypto"]))
 
 
-def test_tools_are_marked_read_only():
+def test_only_order_tools_are_marked_destructive():
     import asyncio
 
     from schwab_mcp.server import mcp
@@ -243,11 +243,13 @@ def test_tools_are_marked_read_only():
     tools = asyncio.run(mcp.list_tools())
     assert {t.name for t in tools} == {
         "get_accounts", "get_account_summary", "get_positions", "get_quote",
-        "get_price_history", "get_option_chain", "get_market_hours",
+        "get_price_history", "get_option_chain", "get_market_hours", "get_orders",
+        "place_order", "replace_order", "cancel_order",
     }
     for t in tools:
-        assert t.annotations.read_only_hint is True
-        assert t.annotations.destructive_hint is False
+        trading = t.name in ("place_order", "replace_order", "cancel_order")
+        assert t.annotations.read_only_hint is (not trading)
+        assert t.annotations.destructive_hint is trading
 
 
 def test_unexpected_exception_is_reported_not_raised(api, backend):
