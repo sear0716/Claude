@@ -153,6 +153,13 @@ def shape_position(p: dict) -> dict:
 def shape_positions(raw: dict, account_hash: str | None) -> dict:
     sa = raw.get("securitiesAccount", {})
     positions = [shape_position(p) for p in sa.get("positions", []) or []]
+    # Share of the account's total value (positions plus cash), so a position's weight is comparable
+    # across accounts. Skipped when Schwab sends no liquidation value.
+    account_value = (sa.get("currentBalances") or {}).get("liquidationValue")
+    if account_value:
+        for pos in positions:
+            if pos.get("market_value") is not None:
+                pos["pct_account"] = round(pos["market_value"] / account_value * 100, 2)
     positions.sort(key=lambda p: -abs(p.get("market_value") or 0))
     totals = {
         "market_value": sum(p.get("market_value") or 0 for p in positions),
@@ -198,7 +205,7 @@ def shape_quote(sym: str, q: dict, include_fundamentals: bool) -> dict:
     )
     if include_fundamentals and q.get("fundamental"):
         f = q["fundamental"]
-        out["fundamentals"] = compact(
+        fundamentals = compact(
             {
                 "pe_ratio": f.get("peRatio"),
                 "eps": f.get("eps"),
@@ -209,6 +216,9 @@ def shape_quote(sym: str, q: dict, include_fundamentals: bool) -> dict:
                 "avg_volume_1y": f.get("avg1YearVolume"),
             }
         )
+        # Indexes such as $SPX come back with every fundamental set to 0; leave those out.
+        if any(v not in (0, 0.0, "") for v in fundamentals.values()):
+            out["fundamentals"] = fundamentals
     return out
 
 

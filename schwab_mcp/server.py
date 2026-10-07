@@ -132,6 +132,8 @@ async def get_account_summary(account: str | None = None, detail: bool = False) 
 async def get_positions(account: str | None = None) -> dict[str, Any]:
     """Current holdings: quantity, average price, cost basis, market value, day P/L and total P/L.
 
+    pct_account is the position's market value as a percent of the account's total value (positions plus cash).
+
     account: last 4 digits or account_hash; may be omitted if you have one account.
     """
     h = await backend.resolve(account)
@@ -179,13 +181,13 @@ async def get_price_history(
         "frequency": frequency,
         "needExtendedHoursData": str(extended_hours).lower(),
     }
-    if start or end:
-        if start:
-            params["startDate"] = _epoch_ms(start)
-        if end:
-            params["endDate"] = _epoch_ms(end + dt.timedelta(days=1)) - 1
+    if start:
+        params["startDate"] = _epoch_ms(start)
     elif period is not None:
         params["period"] = period
+    # Without endDate Schwab stops at the previous trading day's close, which hides today's candles.
+    now_ms = int(dt.datetime.now(dt.timezone.utc).timestamp() * 1000)
+    params["endDate"] = min(_epoch_ms(end + dt.timedelta(days=1)) - 1, now_ms) if end else now_ms
     raw = await backend.client.get("/marketdata/v1/pricehistory", params)
     return fmt.shape_candles(raw or {}, max_candles)
 

@@ -64,10 +64,21 @@ def test_positions(api, backend):
         "day_pl_pct": 0.67,
         "total_pl": 3000.0,
         "total_pl_pct": 20.0,
+        "pct_account": 17.82,  # 18000 / 101000.25 liquidation value
     }
     option = out["positions"][1]
+    assert option["pct_account"] == 0.59
     assert option["cost_basis"] == 1100.0  # market value minus open P/L, multiplier already included
     assert out["totals"] == {"market_value": 18600.0, "day_pl": 80.0, "total_pl": 2500.0}
+
+
+def test_positions_without_liquidation_value_omit_pct_account(api, backend):
+    api.get("/trader/v1/accounts/accountNumbers").respond(json=load("account_numbers.json"))
+    raw = load("account_positions.json")
+    raw["securitiesAccount"]["currentBalances"] = {}
+    api.get("/trader/v1/accounts/HASH_AAA111").respond(json=raw)
+    out = payload(call("get_positions", account="HASH_AAA111"))
+    assert out["count"] == 2 and all("pct_account" not in p for p in out["positions"])
 
 
 def test_positions_requires_account_choice_when_several(api, backend):
@@ -123,6 +134,27 @@ def test_price_history_date_range_is_sent_as_epoch_ms(api, backend):
     assert sent["startDate"] == "1733011200000"
     assert sent["endDate"] == "1735689599999"
     assert "period" not in sent
+
+
+def test_price_history_sends_end_date_now_so_today_is_included(api, backend):
+    import time
+
+    route = api.get("/marketdata/v1/pricehistory").respond(json=load("price_history.json"))
+    before = int(time.time() * 1000)
+    payload(call("get_price_history", symbol="SPY", period_type="day", period=1, frequency_type="minute",
+                 frequency=5))
+    sent = route.calls.last.request.url.params
+    assert sent["period"] == "1" and "startDate" not in sent
+    assert before <= int(sent["endDate"]) <= int(time.time() * 1000)
+
+
+def test_index_quote_omits_all_zero_fundamentals(api, backend):
+    api.get("/marketdata/v1/quotes").respond(json={
+        "$SPX": {"assetMainType": "INDEX", "symbol": "$SPX", "realtime": True,
+                 "quote": {"lastPrice": 5800.5},
+                 "fundamental": {"peRatio": 0, "eps": 0.0, "divYield": 0, "divAmount": 0, "avg10DaysVolume": 0}}})
+    q = payload(call("get_quote", symbols=["$SPX"], include_fundamentals=True))["quotes"][0]
+    assert q["last"] == 5800.5 and "fundamentals" not in q
 
 
 @pytest.mark.parametrize(
