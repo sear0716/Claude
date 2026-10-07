@@ -64,10 +64,21 @@ def test_positions(api, backend):
         "day_pl_pct": 0.67,
         "total_pl": 3000.0,
         "total_pl_pct": 20.0,
+        "pct_account": 17.82,  # 18000 / 101000.25 liquidation value
     }
     option = out["positions"][1]
+    assert option["pct_account"] == 0.59
     assert option["cost_basis"] == 1100.0  # market value minus open P/L, multiplier already included
     assert out["totals"] == {"market_value": 18600.0, "day_pl": 80.0, "total_pl": 2500.0}
+
+
+def test_positions_without_liquidation_value_omit_pct_account(api, backend):
+    api.get("/trader/v1/accounts/accountNumbers").respond(json=load("account_numbers.json"))
+    raw = load("account_positions.json")
+    raw["securitiesAccount"]["currentBalances"] = {}
+    api.get("/trader/v1/accounts/HASH_AAA111").respond(json=raw)
+    out = payload(call("get_positions", account="HASH_AAA111"))
+    assert out["count"] == 2 and all("pct_account" not in p for p in out["positions"])
 
 
 def test_positions_requires_account_choice_when_several(api, backend):

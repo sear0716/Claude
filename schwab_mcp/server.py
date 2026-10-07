@@ -132,6 +132,8 @@ async def get_account_summary(account: str | None = None, detail: bool = False) 
 async def get_positions(account: str | None = None) -> dict[str, Any]:
     """Current holdings: quantity, average price, cost basis, market value, day P/L and total P/L.
 
+    pct_account is the position's market value as a percent of the account's total value (positions plus cash).
+
     account: last 4 digits or account_hash; may be omitted if you have one account.
     """
     h = await backend.resolve(account)

@@ -6,7 +6,7 @@ A local MCP server (stdio) that lets Claude Code and Claude Desktop read your Ch
 |---|---|
 | `get_accounts` | Linked accounts: masked number (`****1234`), account type, and the `account_hash` the API needs |
 | `get_account_summary` | Liquidation value, equity, cash, buying power, margin figures. `account` (last 4 or hash) is optional, and `detail=true` adds Schwab's full balance blocks |
-| `get_positions` | Each holding's quantity, average price, cost basis, market value, day P/L and total P/L, plus totals |
+| `get_positions` | Each holding's quantity, average price, cost basis, market value, day P/L, total P/L and `pct_account` (percent of the account's total value, cash included), plus totals |
 | `get_quote` | Quotes for up to 50 symbols (`AAPL`, `BRK.B`, `$SPX`, `/ES`). `include_fundamentals=true` adds P/E, EPS and dividend data |
 | `get_price_history` | OHLCV candles as compact rows. Set `period_type`/`period`/`frequency_type`/`frequency`, or use `start_date`/`end_date` |
 | `get_option_chain` | By default: 10 strikes around the money and the next 3 expirations within 60 days, in compact rows. Widen it with `strike_count`, `max_expirations`, `from_date`, `to_date`, `strike_range`, `contract_type`, or `full=true` |
