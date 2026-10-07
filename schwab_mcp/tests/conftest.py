@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 from pathlib import Path
 
@@ -22,6 +23,17 @@ FAKE_ACCESS = "FAKE-ACCESS-TOKEN-abc123"
 FAKE_REFRESH = "FAKE-REFRESH-TOKEN-xyz789"
 FAKE_SECRET = "FAKE-APP-SECRET-000"
 FULL_ACCOUNT_NUMBERS = ("12345678", "87654321")
+
+
+@pytest.fixture(autouse=True)
+def isolated_env(tmp_path, monkeypatch):
+    """Keep the developer's real .env and SCHWAB_* variables out of every test."""
+    for var in [v for v in os.environ if v.startswith("SCHWAB_")]:
+        monkeypatch.delenv(var)
+    monkeypatch.setenv("SCHWAB_ENV_FILE", str(tmp_path / "no.env"))
+    monkeypatch.setenv("SCHWAB_APP_KEY", "FAKE-APP-KEY")
+    monkeypatch.setenv("SCHWAB_APP_SECRET", FAKE_SECRET)
+    monkeypatch.setenv("SCHWAB_CALLBACK_URL", "https://127.0.0.1:8182")
 
 
 def load(name: str):
