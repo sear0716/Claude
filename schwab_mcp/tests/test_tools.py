@@ -125,6 +125,27 @@ def test_price_history_date_range_is_sent_as_epoch_ms(api, backend):
     assert "period" not in sent
 
 
+def test_price_history_sends_end_date_now_so_today_is_included(api, backend):
+    import time
+
+    route = api.get("/marketdata/v1/pricehistory").respond(json=load("price_history.json"))
+    before = int(time.time() * 1000)
+    payload(call("get_price_history", symbol="SPY", period_type="day", period=1, frequency_type="minute",
+                 frequency=5))
+    sent = route.calls.last.request.url.params
+    assert sent["period"] == "1" and "startDate" not in sent
+    assert before <= int(sent["endDate"]) <= int(time.time() * 1000)
+
+
+def test_index_quote_omits_all_zero_fundamentals(api, backend):
+    api.get("/marketdata/v1/quotes").respond(json={
+        "$SPX": {"assetMainType": "INDEX", "symbol": "$SPX", "realtime": True,
+                 "quote": {"lastPrice": 5800.5},
+                 "fundamental": {"peRatio": 0, "eps": 0.0, "divYield": 0, "divAmount": 0, "avg10DaysVolume": 0}}})
+    q = payload(call("get_quote", symbols=["$SPX"], include_fundamentals=True))["quotes"][0]
+    assert q["last"] == 5800.5 and "fundamentals" not in q
+
+
 @pytest.mark.parametrize(
     "kwargs",
     [

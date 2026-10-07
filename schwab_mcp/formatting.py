@@ -198,7 +198,7 @@ def shape_quote(sym: str, q: dict, include_fundamentals: bool) -> dict:
     )
     if include_fundamentals and q.get("fundamental"):
         f = q["fundamental"]
-        out["fundamentals"] = compact(
+        fundamentals = compact(
             {
                 "pe_ratio": f.get("peRatio"),
                 "eps": f.get("eps"),
@@ -209,6 +209,9 @@ def shape_quote(sym: str, q: dict, include_fundamentals: bool) -> dict:
                 "avg_volume_1y": f.get("avg1YearVolume"),
             }
         )
+        # Indexes such as $SPX come back with every fundamental set to 0; leave those out.
+        if any(v not in (0, 0.0, "") for v in fundamentals.values()):
+            out["fundamentals"] = fundamentals
     return out
 
 
