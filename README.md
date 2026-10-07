@@ -2,6 +2,7 @@
 Claude Projects
 
 - [`telegram-bot/`](telegram-bot/README.md): chat with Claude from Telegram using a BotFather token.
+- [`gap_bot/`](gap_bot/README.md): gap-and-go paper trading bot for Interactive Brokers (S&P 500 gap scanner, 5-minute trading loop, backtest).
 - [`schwab_mcp/`](schwab_mcp/README.md): read-only MCP server for your Schwab accounts and market data (Claude Code and Claude Desktop).
 
 ## IB account check

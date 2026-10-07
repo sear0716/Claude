@@ -1,0 +1,37 @@
+{
+  "universe": {
+    "min_price": 3.0,
+    "min_gap_pct": 3.0,
+    "max_watchlist": 20
+  },
+  "entry": {
+    "D1_above_prev_high": true,
+    "D2_sma_length": 200,
+    "D3_min_gap_pct": 3.0,
+    "I1_above_premarket_high": true,
+    "I2_new_high_of_day": true,
+    "I3_min_relative_volume": 2.0,
+    "I3_volume_lookback_days": 14
+  },
+  "time_gates_et": {
+    "market_open": "09:30",
+    "earliest_entry": "10:05",
+    "latest_entry": "15:30",
+    "force_close": "15:51",
+    "market_close": "16:00"
+  },
+  "exits": {
+    "initial_stop_below_lod_pct": 1.0,
+    "partial_at_r": 0.75,
+    "partial_fraction": 0.3333,
+    "breakeven_at_r": 1.0,
+    "trail_swing_bars": 2,
+    "trail_offset": 0.01
+  },
+  "risk": {
+    "risk_per_trade_pct": 1.0,
+    "max_position_pct": 10.0,
+    "max_concurrent_positions": 5,
+    "max_trades_per_day": 5
+  }
+}
