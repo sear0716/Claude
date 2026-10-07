@@ -10,7 +10,8 @@ import pytest
 from .conftest import FAKE_ACCESS, FAKE_REFRESH, FAKE_SECRET, FULL_ACCOUNT_NUMBERS, call, load
 
 PACKAGE = Path(__file__).resolve().parent.parent
-SOURCES = [p for p in PACKAGE.rglob("*.py") if "tests" not in p.parts]
+# Our own code only: skip the tests and a virtualenv created inside the package folder (as the README does).
+SOURCES = [p for p in PACKAGE.rglob("*.py") if not {"tests", ".venv"} & set(p.relative_to(PACKAGE).parts)]
 WRITE_PATTERNS = [
     r"\.(post|put|patch|delete)\(",
     r"method\s*=\s*[\"'](POST|PUT|PATCH|DELETE)",
