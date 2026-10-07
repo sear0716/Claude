@@ -59,6 +59,6 @@ def load_settings() -> Settings:
         callback_url=callback,
         token_path=Path(os.environ.get("TOKEN_PATH") or DEFAULT_TOKEN_PATH).expanduser(),
         token_store=store,
-        trading_enabled=os.environ.get("SCHWAB_ENABLE_TRADING", "").strip().lower() == "true",
+        trading_enabled=os.environ.get("SCHWAB_TRADING_ENABLED", "").strip().lower() == "true",
         max_order_value=max_value,
     )

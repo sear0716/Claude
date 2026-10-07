@@ -264,14 +264,14 @@ async def get_market_hours(markets: list[str] | None = None, date: str | None = 
 
 
 # --- Orders -----------------------------------------------------------------------------------------------
-# get_orders is read-only. The three order tools are disabled unless SCHWAB_ENABLE_TRADING=true and always
+# get_orders is read-only. The three order tools are disabled unless SCHWAB_TRADING_ENABLED=true and always
 # work in two steps: a preview that returns a confirm_token, then the same call again with that token.
 
 
 def _require_trading() -> None:
     if not backend.settings.trading_enabled:
         raise InvalidInput(
-            "Trading is disabled. To enable the order tools, set SCHWAB_ENABLE_TRADING=true in your .env "
+            "Trading is disabled. To enable the order tools, set SCHWAB_TRADING_ENABLED=true in your .env "
             "and restart the server."
         )
 
@@ -374,7 +374,7 @@ async def place_order(
     """Place a single-leg equity or option order. TWO STEPS: without confirm_token it only previews.
 
     Show the preview to the user; only after they explicitly agree, call again with the same arguments
-    plus the confirm_token to send it. Requires SCHWAB_ENABLE_TRADING=true.
+    plus the confirm_token to send it. Requires SCHWAB_TRADING_ENABLED=true.
 
     instruction: equities BUY | SELL | SELL_SHORT | BUY_TO_COVER; options BUY_TO_OPEN | BUY_TO_CLOSE |
     SELL_TO_OPEN | SELL_TO_CLOSE. order_type: MARKET | LIMIT | STOP | STOP_LIMIT (limit_price / stop_price
@@ -404,7 +404,7 @@ async def replace_order(
     """Replace a working order with a complete new order spec (Schwab gives it a new order id).
 
     TWO STEPS: without confirm_token it previews, showing the existing order next to the new one. Same
-    arguments as place_order plus order_id (from get_orders). Requires SCHWAB_ENABLE_TRADING=true.
+    arguments as place_order plus order_id (from get_orders). Requires SCHWAB_TRADING_ENABLED=true.
     """
     _require_trading()
     oid = _order_id(order_id)
@@ -416,7 +416,7 @@ async def replace_order(
 async def cancel_order(order_id: str, account: str | None = None, confirm_token: str | None = None) -> dict[str, Any]:
     """Cancel a working order. TWO STEPS: without confirm_token it previews the order that would be canceled.
 
-    order_id comes from get_orders. Requires SCHWAB_ENABLE_TRADING=true.
+    order_id comes from get_orders. Requires SCHWAB_TRADING_ENABLED=true.
     """
     _require_trading()
     return await _two_step("cancel", account, _order_id(order_id), None, confirm_token)

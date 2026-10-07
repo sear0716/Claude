@@ -192,13 +192,13 @@ def test_settings_default_off_and_cap(monkeypatch, tmp_path):
            "SCHWAB_ENV_FILE": str(tmp_path / "none.env")}
     for k, val in env.items():
         monkeypatch.setenv(k, val)
-    monkeypatch.delenv("SCHWAB_ENABLE_TRADING", raising=False)
+    monkeypatch.delenv("SCHWAB_TRADING_ENABLED", raising=False)
     monkeypatch.delenv("SCHWAB_MAX_ORDER_VALUE", raising=False)
     s = load_settings()
     assert s.trading_enabled is False and s.max_order_value == 5000.0
-    monkeypatch.setenv("SCHWAB_ENABLE_TRADING", "yes")  # only the exact word "true" enables it
+    monkeypatch.setenv("SCHWAB_TRADING_ENABLED", "yes")  # only the exact word "true" enables it
     assert load_settings().trading_enabled is False
-    monkeypatch.setenv("SCHWAB_ENABLE_TRADING", "TRUE")
+    monkeypatch.setenv("SCHWAB_TRADING_ENABLED", "TRUE")
     monkeypatch.setenv("SCHWAB_MAX_ORDER_VALUE", "250")
     s = load_settings()
     assert s.trading_enabled is True and s.max_order_value == 250.0

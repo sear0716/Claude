@@ -1,6 +1,6 @@
 # Schwab MCP server
 
-A local MCP server (stdio) that lets Claude Code and Claude Desktop read your Charles Schwab account and market data. By default it is read-only. Order tools (`place_order`, `replace_order`, `cancel_order`) exist but are switched off until you set `SCHWAB_ENABLE_TRADING=true` in `.env`; see [Trading](#trading-off-by-default).
+A local MCP server (stdio) that lets Claude Code and Claude Desktop read your Charles Schwab account and market data. By default it is read-only. Order tools (`place_order`, `replace_order`, `cancel_order`) exist but are switched off until you set `SCHWAB_TRADING_ENABLED=true` in `.env`; see [Trading](#trading-off-by-default).
 
 | Tool | What it returns |
 |---|---|
@@ -97,7 +97,7 @@ python -m schwab_mcp.auth --status
 
 ## Trading (off by default)
 
-`place_order`, `replace_order` and `cancel_order` refuse to run unless `SCHWAB_ENABLE_TRADING=true` is in your `.env` (the exact word `true`; restart the server after changing it). The guardrails:
+`place_order`, `replace_order` and `cancel_order` refuse to run unless `SCHWAB_TRADING_ENABLED=true` is in your `.env` (the exact word `true`; restart the server after changing it). The guardrails:
 
 - **Two steps, always.** The first call only previews: it shows the order, its estimated value, and a `confirm_token`. Nothing is sent. To send it, call the same tool again with identical arguments plus that token. The token works once, expires after 5 minutes, and is bound to the exact order, so changing any argument needs a new preview. Claude is told to show you the preview and get your go-ahead before confirming, and Claude Code also asks you before each call because the tools are marked destructive.
 - **Value cap.** Orders whose estimated value is over `SCHWAB_MAX_ORDER_VALUE` (default `5000` USD; options count x100) are refused. Market orders are sized from the current ask/last quote, and refused if there is no quote.
