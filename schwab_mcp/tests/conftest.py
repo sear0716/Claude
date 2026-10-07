@@ -103,3 +103,13 @@ def payload(result) -> dict:
 def error_text(result) -> str:
     assert result.is_error, result.structured_content
     return " ".join(getattr(c, "text", "") for c in result.content)
+
+
+@pytest.fixture
+def trading(settings, client, monkeypatch):
+    """Backend with trading enabled (cap $5,000) and the accounts endpoint mocked by the test."""
+    from dataclasses import replace
+
+    b = server.Backend(client, replace(settings, trading_enabled=True, max_order_value=5000.0))
+    monkeypatch.setattr(server, "backend", b)
+    return b

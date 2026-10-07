@@ -28,6 +28,7 @@ FREQUENCY_TYPES = {
 FREQUENCIES = {"minute": (1, 5, 10, 15, 30), "daily": (1,), "weekly": (1,), "monthly": (1,)}
 MARKETS = ("equity", "option", "bond", "future", "forex")
 CONTRACT_TYPES = ("ALL", "CALL", "PUT")
+ORDER_STATUSES = ("WORKING", "FILLED", "CANCELED", "REJECTED", "QUEUED", "PENDING_ACTIVATION", "EXPIRED", "ACCEPTED", "REPLACED")
 STRIKE_RANGES = ("ALL", "ITM", "NTM", "OTM", "SAK", "SBK", "SNK")
 
 

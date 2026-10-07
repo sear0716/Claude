@@ -1,4 +1,4 @@
-"""Read-only enforcement and secret hygiene."""
+"""Write-path containment and secret hygiene."""
 
 import json
 import logging
@@ -36,11 +36,24 @@ def test_no_write_calls_in_source(pattern):
             # The only allowed POST: the OAuth token endpoint (code exchange and refresh).
             if path.name == "oauth.py" and re.search(r"\.post\(", line):
                 continue
-            # The client's guard that refuses order paths.
-            if path.name == "client.py" and '"/orders" in path' in line:
+            # client.py is the only place allowed to touch order endpoints; see the tests below.
+            if path.name == "client.py":
+                continue
+            # server.py names the three guarded order tools.
+            if path.name == "server.py" and re.search(r"place_order|replace_order|cancel_order", line):
                 continue
             offenders.append(f"{path.name}:{lineno}: {line.strip()}")
     assert not offenders, offenders
+
+
+def test_client_has_one_request_call_and_only_order_writes():
+    source = (PACKAGE / "client.py").read_text()
+    assert source.count(".request(") == 1  # every HTTP call goes through _send
+    for pattern in (r"\.(post|put|patch|delete)\(", r"\.send\(", r"\.stream\("):
+        assert not re.search(pattern, source)
+    assert 'ORDER_PATH_RE = re.compile(r"^/trader/v1/accounts/[A-Za-z0-9_-]+/orders(/\\d+)?$")' in source
+    # The path regex, the guard in get(), and the one place the order path is built.
+    assert source.count("/orders") == 5, "new references to order paths must be reviewed"
 
 
 def test_oauth_posts_only_to_token_endpoint():
@@ -59,6 +72,7 @@ def full_api(api, backend):
     api.get("/marketdata/v1/pricehistory").respond(json=load("price_history.json"))
     api.get("/marketdata/v1/chains").respond(json=load("option_chain.json"))
     api.get("/marketdata/v1/markets").respond(json=load("market_hours.json"))
+    api.get("/trader/v1/accounts/HASH_AAA111/orders").respond(json=load("orders.json"))
     return api
 
 
@@ -71,6 +85,7 @@ CALLS = [
     ("get_price_history", {"symbol": "AAPL"}),
     ("get_option_chain", {"symbol": "AAPL", "from_date": "2025-01-01", "full": True}),
     ("get_market_hours", {}),
+    ("get_orders", {"account": "5678"}),
 ]
 
 

@@ -1,4 +1,4 @@
-"""MCP server (stdio) exposing read-only Schwab account and market data tools."""
+"""MCP server (stdio): read-only Schwab account and market data tools, plus opt-in guarded order tools."""
 
 from __future__ import annotations
 
@@ -13,9 +13,10 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
 from . import formatting as fmt
+from . import orders as od
 from . import validation as v
 from .client import SchwabClient
-from .config import load_settings
+from .config import Settings, load_settings
 from .errors import InvalidInput, SchwabError
 from .oauth import TokenManager
 from .tokens import make_store
@@ -25,26 +26,37 @@ log = logging.getLogger("schwab_mcp")
 mcp = MCPServer(
     name="schwab",
     instructions=(
-        "Read-only access to the user's Charles Schwab accounts and market data. "
+        "Access to the user's Charles Schwab accounts and market data. "
         "Account numbers are masked to the last 4 digits; use account_hash (from get_accounts) "
-        "or the last 4 digits to pick an account. No trading is possible through this server."
+        "or the last 4 digits to pick an account. Order tools (place_order, replace_order, cancel_order) "
+        "only work when the user enabled trading in .env. They always preview first and send only when "
+        "called again with the confirm_token the preview returned; show the user the preview and get "
+        "their explicit go-ahead before confirming."
     ),
 )
 READ_ONLY = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=True)
+TRADING = ToolAnnotations(read_only_hint=False, destructive_hint=True, idempotent_hint=False, open_world_hint=True)
 
 
 class Backend:
     """Lazily built so the server starts (and reports config problems per call) without a .env."""
 
-    def __init__(self, client: SchwabClient | None = None):
+    def __init__(self, client: SchwabClient | None = None, settings: Settings | None = None):
         self._client = client
+        self._settings = settings
+        self.confirm = od.ConfirmTokens()
         self._accounts: list[dict] | None = None  # [{"accountNumber", "hashValue"}]
+
+    @property
+    def settings(self) -> Settings:
+        if self._settings is None:
+            self._settings = load_settings()
+        return self._settings
 
     @property
     def client(self) -> SchwabClient:
         if self._client is None:
-            settings = load_settings()
-            self._client = SchwabClient(TokenManager(settings, make_store(settings)))
+            self._client = SchwabClient(TokenManager(self.settings, make_store(self.settings)))
         return self._client
 
     def known_numbers(self) -> list[str]:
@@ -81,8 +93,10 @@ class Backend:
 backend = Backend()
 
 
-def tool(fn):
-    """Register a read-only tool that turns every failure into a readable ToolError and masks output."""
+def tool(fn=None, *, annotations: ToolAnnotations = READ_ONLY):
+    """Register a tool that turns every failure into a readable ToolError and masks output."""
+    if fn is None:
+        return lambda f: tool(f, annotations=annotations)
 
     @functools.wraps(fn)
     async def wrapper(*args, **kwargs):
@@ -95,7 +109,7 @@ def tool(fn):
             raise ToolError(f"Unexpected error ({type(exc).__name__}). Check the server log.") from None
         return fmt.scrub(result, backend.known_numbers())
 
-    return mcp.tool(annotations=READ_ONLY)(wrapper)
+    return mcp.tool(annotations=annotations)(wrapper)
 
 
 @tool
@@ -247,6 +261,165 @@ async def get_market_hours(markets: list[str] | None = None, date: str | None = 
         params["date"] = d.isoformat()
     raw = await backend.client.get("/marketdata/v1/markets", params)
     return fmt.shape_market_hours(raw or {})
+
+
+# --- Orders -----------------------------------------------------------------------------------------------
+# get_orders is read-only. The three order tools are disabled unless SCHWAB_ENABLE_TRADING=true and always
+# work in two steps: a preview that returns a confirm_token, then the same call again with that token.
+
+
+def _require_trading() -> None:
+    if not backend.settings.trading_enabled:
+        raise InvalidInput(
+            "Trading is disabled. To enable the order tools, set SCHWAB_ENABLE_TRADING=true in your .env "
+            "and restart the server."
+        )
+
+
+def _order_id(value: str) -> str:
+    oid = str(value or "").strip()
+    if not oid.isdigit() or len(oid) > 20:
+        raise InvalidInput("order_id must be the numeric order id from get_orders.")
+    return oid
+
+
+async def _quote_price(spec: dict[str, Any]) -> float | None:
+    """Ask/last price for sizing a market order; None when the spec already has a price."""
+    if od.unit_price(spec) is not None:
+        return None
+    sym = od.leg(spec)["instrument"]["symbol"]
+    raw = await backend.client.get("/marketdata/v1/quotes", {"symbols": sym, "fields": "quote"})
+    q = ((raw or {}).get(sym) or {}).get("quote") or {}
+    prices = [q.get(k) for k in ("askPrice", "lastPrice", "mark") if isinstance(q.get(k), (int, float))]
+    return max(prices) if prices else None
+
+
+async def _two_step(
+    kind: str, account: str | None, order_id: str | None, spec: dict[str, Any] | None, confirm_token: str | None
+) -> dict[str, Any]:
+    h = await backend.resolve(account)
+    current = None
+    if order_id:
+        current = od.shape_order(await backend.client.get_order(h, order_id))
+    value = None
+    if spec is not None:
+        value = od.estimate_value(spec, await _quote_price(spec))
+        od.check_cap(value, backend.settings.max_order_value)
+    fingerprint = backend.confirm.fingerprint(kind, h, order_id, spec)
+    if not confirm_token:
+        out: dict[str, Any] = {
+            "status": "PREVIEW - nothing was sent",
+            "action": kind,
+            "account": fmt.mask_account(
+                next((a.get("accountNumber") for a in await backend.account_numbers() if a.get("hashValue") == h), "")
+            ),
+        }
+        if spec is not None:
+            out["order"] = od.describe(spec)
+            out["estimated_value"] = float(value)
+            out["max_order_value"] = backend.settings.max_order_value
+        if current is not None:
+            out["existing_order"] = current
+        out["confirm_token"] = backend.confirm.issue(fingerprint)
+        out["expires_in_seconds"] = od.TOKEN_TTL
+        out["next"] = "To send, call the same tool again with identical arguments plus this confirm_token."
+        return out
+    backend.confirm.redeem(confirm_token, fingerprint)
+    method = {"place": "POST", "replace": "PUT", "cancel": "DELETE"}[kind]
+    log.warning("Sending %s order request", kind)
+    result = await backend.client.send_order(method, h, order_id, spec)
+    return {"status": {"place": "SENT", "replace": "REPLACE SENT", "cancel": "CANCEL SENT"}[kind], **result,
+            "next": "Call get_orders to confirm the order's status."}
+
+
+@tool
+async def get_orders(
+    account: str | None = None, status: str | None = None, days: int = 7, max_results: int = 50
+) -> dict[str, Any]:
+    """Recent orders (read-only): order_id, status, type, quantity, filled, price, legs.
+
+    account: last 4 digits or account_hash. status: optional, e.g. WORKING, FILLED, CANCELED, REJECTED, QUEUED.
+    days: how far back to look (1-60). Use this to find the order_id that replace_order and cancel_order need.
+    """
+    v.int_range(days, 1, 60, "days")
+    v.int_range(max_results, 1, 200, "max_results")
+    h = await backend.resolve(account)
+    now = dt.datetime.now(dt.timezone.utc)
+    fmt_t = "%Y-%m-%dT%H:%M:%S.000Z"
+    params: dict[str, Any] = {
+        "fromEnteredTime": (now - dt.timedelta(days=days)).strftime(fmt_t),
+        "toEnteredTime": now.strftime(fmt_t),
+        "maxResults": max_results,
+    }
+    if status:
+        params["status"] = v.choice(status, v.ORDER_STATUSES, "status")
+    raw = await backend.client.get_orders(h, params)
+    return {"orders": [od.shape_order(o) for o in raw or []][:max_results]}
+
+
+@tool(annotations=TRADING)
+async def place_order(
+    symbol: str,
+    instruction: str,
+    quantity: int,
+    order_type: str,
+    asset_type: str = "EQUITY",
+    limit_price: float | None = None,
+    stop_price: float | None = None,
+    duration: str = "DAY",
+    session: str = "NORMAL",
+    account: str | None = None,
+    confirm_token: str | None = None,
+) -> dict[str, Any]:
+    """Place a single-leg equity or option order. TWO STEPS: without confirm_token it only previews.
+
+    Show the preview to the user; only after they explicitly agree, call again with the same arguments
+    plus the confirm_token to send it. Requires SCHWAB_ENABLE_TRADING=true.
+
+    instruction: equities BUY | SELL | SELL_SHORT | BUY_TO_COVER; options BUY_TO_OPEN | BUY_TO_CLOSE |
+    SELL_TO_OPEN | SELL_TO_CLOSE. order_type: MARKET | LIMIT | STOP | STOP_LIMIT (limit_price / stop_price
+    as required). duration: DAY | GTC. session: NORMAL | AM | PM | SEAMLESS. Option symbols are OCC format
+    like 'AAPL  250117C00150000'. Orders over SCHWAB_MAX_ORDER_VALUE are refused.
+    """
+    _require_trading()
+    spec = od.build_spec(symbol, instruction, quantity, order_type, asset_type, limit_price, stop_price, duration, session)
+    return await _two_step("place", account, None, spec, confirm_token)
+
+
+@tool(annotations=TRADING)
+async def replace_order(
+    order_id: str,
+    symbol: str,
+    instruction: str,
+    quantity: int,
+    order_type: str,
+    asset_type: str = "EQUITY",
+    limit_price: float | None = None,
+    stop_price: float | None = None,
+    duration: str = "DAY",
+    session: str = "NORMAL",
+    account: str | None = None,
+    confirm_token: str | None = None,
+) -> dict[str, Any]:
+    """Replace a working order with a complete new order spec (Schwab gives it a new order id).
+
+    TWO STEPS: without confirm_token it previews, showing the existing order next to the new one. Same
+    arguments as place_order plus order_id (from get_orders). Requires SCHWAB_ENABLE_TRADING=true.
+    """
+    _require_trading()
+    oid = _order_id(order_id)
+    spec = od.build_spec(symbol, instruction, quantity, order_type, asset_type, limit_price, stop_price, duration, session)
+    return await _two_step("replace", account, oid, spec, confirm_token)
+
+
+@tool(annotations=TRADING)
+async def cancel_order(order_id: str, account: str | None = None, confirm_token: str | None = None) -> dict[str, Any]:
+    """Cancel a working order. TWO STEPS: without confirm_token it previews the order that would be canceled.
+
+    order_id comes from get_orders. Requires SCHWAB_ENABLE_TRADING=true.
+    """
+    _require_trading()
+    return await _two_step("cancel", account, _order_id(order_id), None, confirm_token)
 
 
 def _epoch_ms(d: dt.date) -> int:
