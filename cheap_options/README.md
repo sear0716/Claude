@@ -56,7 +56,8 @@ Verdicts: `CHEAP` (score 65+), `cheap-ish` (55-65), `fair` (45-55), `rich` (<45)
 - **Historical payoff** (`HistEV%`, `Win%`): takes every overlapping window of the option's length from
   the last 3 years of prices, rescales them so their average equals the forward (removing the stock's
   past trend, so this is a test of movement, not direction), and averages the option's payoff.
-  `HistEV%` is that average against today's mid price; `Win%` is how often the payoff beat the premium.
+  `HistEV%` is that average against today's ask price, because a buyer pays the far side of the
+  spread; `Win%` is how often the payoff beat the ask.
 - **IV percentile**: free data has no IV history, so on first use the scanner ranks today's 30-day IV
   against the past year of 21-day realised volatility and labels it `realised-vol proxy`. Because IV
   normally sits above realised volatility, the proxy leans towards calling options expensive. Every run
@@ -74,6 +75,9 @@ Three tables: one row per underlying (IV vs forecast and history, term-structure
 expiry (IV, forecast, implied move from the at-the-money straddle vs the average historical move), and
 the ranked contracts. `(E)` marks expiries that span an earnings date: IV is normally raised ahead of
 earnings, and history-based comparisons understate the coming move, so read those rows with care.
+When two or more expiries span the announcement, a note gives the one-day earnings move the chain is
+pricing and the at-the-money volatility with that move removed (solved from the total variance of
+two expiries), so you can see whether the options are expensive day to day or only for the event.
 `--csv` and `--json` write the same data with every component score.
 
 ## Filters (defaults)
@@ -103,6 +107,14 @@ All are adjustable; see `python -m cheap_options --help`.
 | `yahoo` (default) | `yfinance` | Free, no account, delayed. Also supplies the next earnings date. |
 | `schwab` | the `schwab_mcp` setup in this repo | Real-time chain and 5 years of daily prices; read-only calls. |
 | `--from-snapshot` | files written by `--save-snapshot DIR` | Re-run the analysis offline on saved data. |
+
+## Relation to the Options Mastery Roadmap
+
+The scanner automates the roadmap's Stage 4 and Stage 6 checks: implied against forecast realised
+volatility as the primary variable, IV rank treated as context and not as a signal, skew and term
+structure, the earnings implied move, expected value after costs instead of probability of profit,
+and spreads measured as a percentage of mid. Its default filters avoid the contracts the roadmap
+identifies as the main source of retail losses: far out-of-the-money and very short-dated options.
 
 ## References
 

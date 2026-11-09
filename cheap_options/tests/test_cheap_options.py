@@ -174,6 +174,34 @@ def test_earnings_inside_an_expiry_is_flagged():
     assert all(c.spans_earnings == (c.dte > 30) for c in rep.contracts)
 
 
+def test_earnings_move_is_backed_out_of_two_expiries():
+    base_vol, event = 0.30, 0.06  # 30% everyday vol plus a 6% one-day earnings move
+    snap = demo.make_snapshot("X", 0.25, 0.30, seed=2, dtes=(10,), spread=0.01)
+    for dte in (24, 45):
+        total = math.sqrt(base_vol**2 + event**2 / (dte / 365))
+        snap.quotes += demo.make_snapshot("X", 0.25, total, seed=2, dtes=(dte,), spread=0.01).quotes
+    assert analyze(snap).earnings_move is None  # no earnings date known
+    snap.earnings_date = snap.asof + dt.timedelta(days=15)
+    rep = analyze(snap)
+    assert rep.earnings_move == pytest.approx(event, abs=0.004)
+    assert rep.ex_earnings_vol == pytest.approx(base_vol, abs=0.01)
+    assert "one-standard-deviation move of 6." in rep.notes[0]
+    snap.earnings_date = snap.asof + dt.timedelta(days=30)  # only one expiry spans it: not solvable
+    assert analyze(snap).earnings_move is None
+
+
+def test_historical_value_is_judged_against_the_ask():
+    tight = analyze(demo.make_snapshot("X", 0.30, 0.25, seed=4, spread=0.0))
+    wide = analyze(demo.make_snapshot("X", 0.30, 0.25, seed=4, spread=0.20))
+    key = lambda c: (c.dte, c.quote.strike, c.quote.right)
+    wide_by_key = {key(c): c for c in wide.contracts}
+    pairs = [(c, wide_by_key[key(c)]) for c in tight.contracts if key(c) in wide_by_key and c.quote.mid > 1]
+    assert pairs
+    for t, w in pairs:
+        assert w.hist_fair == pytest.approx(t.hist_fair, rel=0.01)  # same payoff history
+        assert w.hist_edge == pytest.approx((1 + t.hist_edge) / 1.10 - 1, abs=0.02)  # ask is 10% above mid
+
+
 def test_iv_level_uses_own_history_when_there_is_enough():
     snap = demo.make_snapshot("X", 0.25, 0.30, seed=2)
     proxy = analyze(snap)

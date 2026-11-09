@@ -70,7 +70,7 @@ def render(reports: list[Report], ranked: list[tuple[str, Contract]]) -> str:
           f"{c.delta:+.2f}", _pct(c.quote.spread_pct, 0), str(c.quote.open_interest), f"{c.score:.0f}",
           c.verdict + (" (E)" if c.spans_earnings else "")] for s, c in ranked]))
     out.append("ATMvFc% = the expiry's at-the-money implied vol vs forecast realised vol; vsSmile = vol points vs what neighbouring strikes imply; "
-               "HistEV% = historical average payoff vs mid price; Win% = share of past windows that beat breakeven; "
+               "HistEV% = historical average payoff vs the ask price; Win% = share of past windows whose payoff beat the ask; "
                "(E) = expiry spans an earnings date, where implied vol is normally elevated.")
     notes = [f"{r.symbol}: {n}" for r in reports for n in r.notes]
     if notes:
@@ -98,6 +98,8 @@ def write_json(path: Path, reports: list[Report], ranked: list[tuple[str, Contra
             "hv20": r.hv20, "hv60": r.hv60, "hv252": r.hv252, "yz20": r.yz20, "iv_percentile": r.iv_percentile,
             "iv_rank": r.iv_rank, "level_basis": r.level_basis, "term_slope": r.term_slope, "skew": r.skew,
             "verdict": r.verdict, "notes": r.notes,
+            "earnings_date": r.earnings_date.isoformat() if r.earnings_date else None,
+            "earnings_move": r.earnings_move, "ex_earnings_vol": r.ex_earnings_vol,
             "expiries": [{
                 "expiry": e.expiry.isoformat(), "dte": e.dte, "forward": e.forward, "atm_iv": e.atm_iv,
                 "rv_forecast": e.rv_forecast, "term_fair_iv": e.term_fair_iv, "implied_move": e.implied_move,

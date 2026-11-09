@@ -77,7 +77,7 @@ class Contract:
     rv_forecast: float | None
     smile_iv: float | None
     hist_fair: float | None  # average discounted payoff over history, per share
-    hist_win: float | None  # share of historical windows that finished above breakeven
+    hist_win: float | None  # share of historical windows whose payoff beat the ask
     components: dict[str, float]
     score: float
     spans_earnings: bool
@@ -92,7 +92,7 @@ class Contract:
 
     @property
     def hist_edge(self) -> float | None:
-        return self.hist_fair / self.quote.mid - 1 if self.hist_fair is not None else None
+        return self.hist_fair / self.quote.ask - 1 if self.hist_fair is not None else None
 
 
 @dataclass
@@ -114,6 +114,9 @@ class Report:
     expiries: list[ExpiryStats]
     contracts: list[Contract]
     notes: list[str]
+    earnings_date: dt.date | None = None
+    earnings_move: float | None = None  # one-standard-deviation move the chain prices for the announcement
+    ex_earnings_vol: float | None = None  # at-the-money vol once that move is taken out
 
     @property
     def verdict(self) -> str:
@@ -287,6 +290,10 @@ def analyze(snap: Snapshot, cfg: Config | None = None, iv_history: list[float] |
             contracts.append(_score(q, iv, delta, e, rets, percentile, cfg))
     contracts.sort(key=lambda c: c.score, reverse=True)
 
+    event_move, base_vol = _earnings_move(expiries)
+    if event_move:
+        notes.append(f"earnings {snap.earnings_date}: the chain prices a one-standard-deviation move of "
+                     f"{event_move * 100:.1f}% for the announcement; at-the-money vol without it is {base_vol * 100:.1f}%")
     skew = None
     front = next((e for e in expiries if e.smile), None)
     if front:
@@ -300,7 +307,29 @@ def analyze(snap: Snapshot, cfg: Config | None = None, iv_history: list[float] |
         level_basis=basis,
         term_slope=expiries[-1].atm_iv / expiries[0].atm_iv - 1 if len(expiries) >= 2 else None,
         skew=skew, expiries=expiries, contracts=contracts, notes=notes,
+        earnings_date=snap.earnings_date, earnings_move=event_move, ex_earnings_vol=base_vol,
     )
+
+
+def _earnings_move(expiries: list[ExpiryStats]) -> tuple[float | None, float | None]:
+    """Split the vol of expiries that span earnings into an everyday level and a one-day jump.
+
+    Total variance of such an expiry is base_vol^2 * t + event variance. Two expiries after the
+    announcement give two equations, so both unknowns can be solved for.
+    """
+    spanning = [e for e in expiries if e.spans_earnings]
+    if not spanning:
+        return None, None
+    first = spanning[0]
+    later = next((e for e in spanning if e.dte - first.dte >= 5), None)
+    if later is None:
+        return None, None
+    w1, w2 = first.atm_iv**2 * first.t, later.atm_iv**2 * later.t
+    base_var = (w2 - w1) / (later.t - first.t)
+    event_var = w1 - base_var * first.t
+    if base_var <= 0 or event_var <= 0:
+        return None, None
+    return math.sqrt(event_var), math.sqrt(base_var)
 
 
 def _history_returns(closes: list[float], horizon: int, lookback: int):
@@ -340,8 +369,10 @@ def _score(q: OptionQuote, iv: float, delta: float, e: ExpiryStats, rets, percen
         terminal = e.forward * rets
         payoff = np.maximum(terminal - q.strike, 0) if q.right == "C" else np.maximum(q.strike - terminal, 0)
         hist_fair = float(e.df * payoff.mean())
-        hist_win = float((payoff > q.mid / e.df).mean())
-        comp["hist"] = _clip((hist_fair / q.mid - 1.0) / 0.50)
+        # Against the ask: a buyer pays the far side of the spread, and that cost is where most
+        # of the documented losses on bought options come from.
+        hist_win = float((payoff > q.ask / e.df).mean())
+        comp["hist"] = _clip((hist_fair / q.ask - 1.0) / 0.50)
     comp["spread"] = -_clip(q.spread_pct / 0.20)
     total_w = sum(cfg.weights[k] for k in comp)
     score = 50.0 + 50.0 * sum(cfg.weights[k] * v for k, v in comp.items()) / total_w
