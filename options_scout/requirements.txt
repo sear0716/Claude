@@ -1,0 +1,6 @@
+pandas>=2.1
+numpy>=1.26
+requests>=2.31
+ib_async>=1.0      # Interactive Brokers source (default)
+yfinance>=0.2.50   # free fallback source
+pytest>=8
