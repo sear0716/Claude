@@ -93,6 +93,14 @@ def test_cheap_underlying_scores_high_and_rich_one_scores_low():
     assert all(c.iv_vs_forecast > 0 and c.hist_edge < 0 for c in pricey.contracts)
 
 
+def test_skew_alone_does_not_make_a_strike_look_cheap_against_the_forecast():
+    rep = analyze(demo.make_snapshot("X", 0.25, 0.30, seed=2))
+    front = [c for c in rep.contracts if c.dte == 18]
+    assert max(c.iv for c in front) - min(c.iv for c in front) > 0.01  # strikes do differ in vol
+    assert len({c.components["vrp"] for c in front}) == 1
+    assert front[0].iv_vs_forecast == pytest.approx(rep.expiries[0].atm_iv / rep.expiries[0].rv_forecast - 1)
+
+
 def test_a_strike_below_its_smile_is_found():
     rep = analyze(demo.demo_snapshots()[1])
     best = rep.contracts[0]
@@ -101,6 +109,25 @@ def test_a_strike_below_its_smile_is_found():
     assert best.components["smile"] == 1.0
     others = [c for c in rep.contracts if c is not best]
     assert all(abs(c.components["smile"]) < 0.3 for c in others if "smile" in c.components)
+
+
+def test_a_wing_the_curve_fits_badly_is_not_mistaken_for_cheap_strikes():
+    snap = demo.make_snapshot("X", 0.25, 0.30, seed=2, spread=0.01)
+    t = 46 / 365
+    fwd, df = 100 * math.exp(0.04 * t), math.exp(-0.04 * t)
+    bent = []
+    for q in snap.quotes:  # flatten the whole call wing by 1.5 vol points: a kink no quadratic can follow
+        if (q.expiry - snap.asof).days == 46 and q.right == "C" and q.strike >= 105:
+            iv = pricing.implied_vol(q.mid, fwd, q.strike, t, df, "C") - 0.015
+            price = pricing.black76(fwd, q.strike, iv, t, df, "C")
+            q = OptionQuote(q.expiry, q.strike, "C", round(price * 0.995, 3), round(price * 1.005, 3), 500, 2000)
+        bent.append(q)
+    snap.quotes = bent
+    rep = analyze(snap)
+    e = next(x for x in rep.expiries if x.dte == 46)
+    wing = [c for c in rep.contracts if c.dte == 46 and c.quote.right == "C" and c.quote.strike >= 107.5]
+    assert wing and any(abs(c.iv - e.curve_iv(c.quote.strike)) > 0.004 for c in wing)  # the raw curve misses
+    assert all(abs(c.iv - c.smile_iv) < 0.003 for c in wing)  # the neighbour-adjusted value does not
 
 
 def test_a_cheap_expiry_is_flagged_against_the_term_structure():

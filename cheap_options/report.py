@@ -26,10 +26,10 @@ def contract_row(symbol: str, c: Contract) -> dict:
     q = c.quote
     return {
         "symbol": symbol, "expiry": q.expiry.isoformat(), "dte": c.dte, "strike": q.strike, "right": q.right,
-        "bid": q.bid, "ask": q.ask, "mid": round(q.mid, 4), "iv": round(c.iv, 4),
+        "bid": q.bid, "ask": q.ask, "mid": round(q.mid, 4), "iv": round(c.iv, 4), "atm_iv": round(c.atm_iv, 4),
         "iv_ask": round(c.iv_ask, 4) if c.iv_ask else None,
         "rv_forecast": round(c.rv_forecast, 4) if c.rv_forecast else None,
-        "iv_vs_forecast": round(c.iv_vs_forecast, 4) if c.iv_vs_forecast is not None else None,
+        "atm_iv_vs_forecast": round(c.iv_vs_forecast, 4) if c.iv_vs_forecast is not None else None,
         "iv_vs_smile": round(c.iv - c.smile_iv, 4) if c.smile_iv else None,
         "hist_fair": round(c.hist_fair, 4) if c.hist_fair is not None else None,
         "hist_edge": round(c.hist_edge, 4) if c.hist_edge is not None else None,
@@ -62,14 +62,14 @@ def render(reports: list[Report], ranked: list[tuple[str, Contract]]) -> str:
 
     out.append(f"\nCHEAPEST CONTRACTS  (top {len(ranked)}; score 0-100, 50 = fairly priced)")
     out.append(_table(
-        ["Sym", "Expiry", "DTE", "Strike", "", "Bid", "Ask", "IV", "Fcst", "IV-Fcst%", "vsSmile", "HistEV%", "Win%",
+        ["Sym", "Expiry", "DTE", "Strike", "", "Bid", "Ask", "IV", "ATM IV", "Fcst", "ATMvFc%", "vsSmile", "HistEV%", "Win%",
          "Delta", "Sprd%", "OI", "Score", "Verdict"],
         [[s, c.quote.expiry.isoformat(), str(c.dte), f"{c.quote.strike:g}", c.quote.right,
-          f"{c.quote.bid:.2f}", f"{c.quote.ask:.2f}", _pct(c.iv), _pct(c.rv_forecast), _pct(c.iv_vs_forecast, 0, True),
+          f"{c.quote.bid:.2f}", f"{c.quote.ask:.2f}", _pct(c.iv), _pct(c.atm_iv), _pct(c.rv_forecast), _pct(c.iv_vs_forecast, 0, True),
           _pct(c.iv - c.smile_iv, 1, True) if c.smile_iv else "-", _pct(c.hist_edge, 0, True), _pct(c.hist_win, 0),
           f"{c.delta:+.2f}", _pct(c.quote.spread_pct, 0), str(c.quote.open_interest), f"{c.score:.0f}",
           c.verdict + (" (E)" if c.spans_earnings else "")] for s, c in ranked]))
-    out.append("IV-Fcst% = implied vol vs forecast realised vol; vsSmile = vol points vs the fitted smile; "
+    out.append("ATMvFc% = the expiry's at-the-money implied vol vs forecast realised vol; vsSmile = vol points vs what neighbouring strikes imply; "
                "HistEV% = historical average payoff vs mid price; Win% = share of past windows that beat breakeven; "
                "(E) = expiry spans an earnings date, where implied vol is normally elevated.")
     notes = [f"{r.symbol}: {n}" for r in reports for n in r.notes]

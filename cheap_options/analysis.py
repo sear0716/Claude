@@ -2,7 +2,7 @@
 
 "Cheap" is measured five independent ways (see README for the research behind each):
 
-  vrp    implied vol vs a horizon-matched forecast of realised vol
+  vrp    the expiry's at-the-money implied vol vs a horizon-matched forecast of realised vol
   level  where today's implied vol sits in its own one-year history
   term   the expiry's ATM vol vs the term-structure curve through the other expiries
   smile  the strike's vol vs the smile fitted through the other strikes of that expiry
@@ -49,16 +49,20 @@ class ExpiryStats:
     rv_forecast: float | None
     term_fair_iv: float | None = None
     smile: tuple[float, float, float] | None = None  # iv = a + b*x + c*x^2, x in ATM standard deviations
+    smile_fair: dict[float, float] = field(default_factory=dict)  # strike -> vol its neighbours imply
     implied_move: float | None = None  # ATM straddle price / forward
     hist_move: float | None = None  # mean |move| over the same horizon in history
     spans_earnings: bool = False
 
-    def smile_iv(self, strike: float) -> float | None:
+    def curve_iv(self, strike: float) -> float | None:
         if self.smile is None:
             return None
         x = math.log(strike / self.forward) / (self.atm_iv * math.sqrt(self.t))
         a, b, c = self.smile
         return a + b * x + c * x * x if abs(x) <= 2.0 else None
+
+    def smile_iv(self, strike: float) -> float | None:
+        return self.smile_fair.get(strike)
 
 
 @dataclass
@@ -66,6 +70,7 @@ class Contract:
     quote: OptionQuote
     dte: int
     iv: float
+    atm_iv: float  # of the expiry; compared with the forecast so that skew is not mistaken for cheapness
     iv_ask: float | None
     delta: float
     vega: float
@@ -83,7 +88,7 @@ class Contract:
 
     @property
     def iv_vs_forecast(self) -> float | None:
-        return self.iv / self.rv_forecast - 1 if self.rv_forecast else None
+        return self.atm_iv / self.rv_forecast - 1 if self.rv_forecast else None
 
     @property
     def hist_edge(self) -> float | None:
@@ -160,6 +165,26 @@ def _fit_smile(xs: list[float], ivs: list[float], weights: list[float]) -> tuple
     return a, b, c
 
 
+def _neighbour_fair(e: ExpiryStats, rows: list[tuple[OptionQuote, float]]) -> dict[float, float]:
+    """Vol each strike should have, judged by the strikes next to it.
+
+    A quadratic never fits a real smile exactly, and where it bends wrongly every strike in that
+    region sits off the curve together. That shared gap is fit error, not mispricing, so the curve
+    is shifted by the median gap of the two strikes on each side before a strike is compared with it.
+    """
+    gaps = []
+    for q, iv in sorted(rows, key=lambda r: r[0].strike):
+        curve = e.curve_iv(q.strike)
+        if curve is not None and q.spread_pct <= 0.5:
+            gaps.append((q.strike, curve, iv - curve))
+    fair = {}
+    for i, (strike, curve, _) in enumerate(gaps):
+        near = [g[2] for g in gaps[max(0, i - 2):i] + gaps[i + 1:i + 3]]
+        if len(near) >= 2:
+            fair[strike] = curve + float(np.median(near))
+    return fair
+
+
 def _interp_total_variance(points: list[tuple[float, float]], t: float) -> float | None:
     """IV at maturity t by linear interpolation of total variance; None outside the range."""
     below = [p for p in points if p[0] <= t]
@@ -226,6 +251,7 @@ def analyze(snap: Snapshot, cfg: Config | None = None, iv_history: list[float] |
         rets = _history_returns(closes, h, cfg.history_days)
         if rets is not None:
             stats.hist_move = float(np.mean(np.abs(rets - 1)))
+        stats.smile_fair = _neighbour_fair(stats, rows)
         expiries.append(stats)
         otm_ivs[expiry] = rows
 
@@ -294,7 +320,9 @@ def _score(q: OptionQuote, iv: float, delta: float, e: ExpiryStats, rets, percen
            cfg: Config) -> Contract:
     comp: dict[str, float] = {}
     if e.rv_forecast:
-        comp["vrp"] = _clip(math.log(e.rv_forecast / iv) / 0.30)
+        # At-the-money vol, not the strike's own: out-of-the-money calls always carry a lower vol
+        # than the forecast because of skew, which the hist and smile measures judge strike by strike.
+        comp["vrp"] = _clip(math.log(e.rv_forecast / e.atm_iv) / 0.30)
     if percentile is not None:
         comp["level"] = 1.0 - 2.0 * percentile
     if e.term_fair_iv:
@@ -318,7 +346,7 @@ def _score(q: OptionQuote, iv: float, delta: float, e: ExpiryStats, rets, percen
     total_w = sum(cfg.weights[k] for k in comp)
     score = 50.0 + 50.0 * sum(cfg.weights[k] * v for k, v in comp.items()) / total_w
     return Contract(
-        quote=q, dte=e.dte, iv=iv,
+        quote=q, dte=e.dte, iv=iv, atm_iv=e.atm_iv,
         iv_ask=pricing.implied_vol(q.ask, e.forward, q.strike, e.t, e.df, q.right),
         delta=delta, vega=pricing.vega(e.forward, q.strike, iv, e.t, e.df) / 100.0,
         rv_forecast=e.rv_forecast, smile_iv=smile_iv, hist_fair=hist_fair, hist_win=hist_win,

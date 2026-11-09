@@ -25,10 +25,10 @@ uses five and combines them into a 0-100 score (50 = fairly priced).
 
 | Measure | Weight | Question it answers | Basis |
 |---|---|---|---|
-| `vrp` | 30% | Is IV below the realised volatility we should expect until expiry? | Goyal & Saretto (2009): stocks whose IV is low relative to historical volatility have high subsequent straddle returns. |
+| `vrp` | 30% | Is the expiry's at-the-money IV below the realised volatility we should expect until expiry? | Goyal & Saretto (2009): stocks whose IV is low relative to historical volatility have high subsequent straddle returns. |
 | `hist` | 20% | Over every past window as long as this option's life, what did this option pay on average, versus its price today? | Model-free check; no pricing-model assumptions beyond put-call parity. |
 | `level` | 15% | Is IV low compared with its own past year? (IV percentile) | Standard brokerage measure (IV rank / IV percentile); volatility mean-reverts. |
-| `smile` | 15% | Is this strike's IV below the smile fitted through the other strikes of the same expiry? | Relative-value check across strikes; a dislocation larger than the bid-ask spread. |
+| `smile` | 15% | Is this strike's IV below what the neighbouring strikes of the same expiry imply? | Relative-value check across strikes; a dislocation larger than the bid-ask spread. |
 | `term` | 10% | Is this expiry's at-the-money IV below the curve through the neighbouring expiries? | Vasquez (2017): the slope of the IV term structure predicts straddle returns. |
 | `spread` | 10% | How much is lost to the bid-ask spread? (always a deduction) | Transaction costs erase most option anomalies for retail-size traders. |
 
@@ -44,6 +44,9 @@ Verdicts: `CHEAP` (score 65+), `cheap-ish` (55-65), `fair` (45-55), `rich` (<45)
   in-the-money option carries the same mispricing as the out-of-the-money option at its strike, and
   out-of-the-money quotes are tighter and almost free of early-exercise premium, which matters because
   US stock options are American-style and the model is European.
+- **IV vs forecast** uses the expiry's at-the-money IV for every strike. Out-of-the-money calls always
+  carry a lower IV than at-the-money options (skew), so comparing each strike's own IV with a single
+  forecast would mark them cheap for no reason; strike-level pricing is judged by `hist` and `smile`.
 - **Realised volatility**: 20-day, 60-day and 1-year close-to-close, plus the 20-day Yang-Zhang (2000)
   estimator, which uses open/high/low/close and is several times more efficient.
 - **Volatility forecast** (`Fcst`): starts from the current level (RiskMetrics EWMA, lambda 0.94) and
@@ -59,8 +62,10 @@ Verdicts: `CHEAP` (score 65+), `cheap-ish` (55-65), `fair` (45-55), `rich` (<45)
   normally sits above realised volatility, the proxy leans towards calling options expensive. Every run
   stores the day's 30-day IV in `~/.cheap_options/iv_history.sqlite`; after 30 daily runs for a symbol
   the scanner switches to its true IV history. Scheduling a daily run makes this measure exact.
-- **Smile**: a weighted quadratic in standardised moneyness, refitted once without outliers so a
-  mispriced strike is measured against its neighbours. The gap is judged against the option's own
+- **Smile**: a weighted quadratic in standardised moneyness, refitted once without outliers, then
+  shifted at each strike by the median gap of the two strikes on either side. Real smiles are not
+  exact quadratics, and without that shift a whole wing that the curve fits badly would look cheap;
+  with it, only a strike that is out of line with its own neighbours scores. The gap is judged against the option's own
   bid-ask width in volatility terms; a gap inside the spread scores near zero.
 
 ### Output

@@ -29,7 +29,10 @@ def fetch(symbol: str, max_dte: int) -> Snapshot:
     bars = bars_from_frame(hist)
     today = dt.date.today()
     quotes: list[OptionQuote] = []
-    for exp in ticker.options:
+    expirations = ticker.options
+    if not expirations:
+        raise RuntimeError("Yahoo returned no option chain (no listed options, or Yahoo is rate-limiting; retry shortly)")
+    for exp in expirations:
         expiry = dt.date.fromisoformat(exp)
         if not 0 < (expiry - today).days <= max_dte:
             continue
