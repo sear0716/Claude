@@ -1,0 +1,2 @@
+numpy>=1.26
+yfinance>=0.2.40  # only for --provider yahoo (the default)
